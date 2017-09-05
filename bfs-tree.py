@@ -42,6 +42,24 @@ def bfssearch(root, target):
 
         queue.extendleft(node.children)
 
+def bfssearchrecur(root, target):
+    if root.num == target:
+        return root
+    queue = collections.deque()
+    queue.appendleft(root)
+    bfstraverserecur(queue, target)
+
+def bfstraverserecur(queue, target):
+    while queue:
+        node = queue.pop()
+        print node.num
+        if node.num == target:
+            queue.clear()
+            return
+        if node.children:
+            queue.extendleft(node.children)
+            bfstraverserecur(queue, target)
+
 def dfssearch(root, target):
     if root.num == target:
         return root
@@ -58,6 +76,26 @@ def dfssearch(root, target):
         children.reverse()
         queue.extend(children) 
 
+def dfssearchrecur(root, target):
+    if root.num == target:
+        return root
+    queue = collections.deque()
+    queue.append(root)
+    dfstraverserecur(queue, target)
+
+def dfstraverserecur(queue, target):
+    while queue:
+        node = queue.pop()
+        print node.num
+        if node.num == target:
+            queue.clear()
+            return node
+        if node.children:
+            children = list(node.children)
+            children.reverse()
+            queue.extend(children)
+            dfstraverserecur(queue, target)
+
 def main():
     rootnum = input('Root node:')
     root = Node(rootnum)
@@ -67,11 +105,15 @@ def main():
     bfssearch(root, 100)
     print 'BFS Search'
     bfssearch(root, 7)
+    print 'BFS Recursive Search'
+    bfssearchrecur(root, 7)
 
     print 'DFS Traversal'
-    print 'DFS Search'
     dfssearch(root, 100)
+    print 'DFS Search'
     dfssearch(root, 7)
+    print 'DFS Recursive Search'
+    dfssearchrecur(root, 7)
 
 if __name__ == '__main__':
     main()
