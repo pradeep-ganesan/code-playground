@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #define RINGSZ 10
 
@@ -9,7 +10,8 @@ struct ringbuf {
     int tip, tail;
     int ringfull, ringempty;
     pthread_mutex_t *mut;
-    pthread_cond_t *cond;
+    pthread_cond_t *condnotfull;
+    pthread_cond_t *condnotempty;
 };
 
 struct ringbuf *initring();
@@ -24,16 +26,18 @@ int main()
     struct ringbuf *ring;
 
     ring = initring();
-    pthread_create(&prodth, NULL, producer, (void *)&ring);
-    pthread_create(&conth, NULL, consumer, (void *)&ring);
+    pthread_create(&prodth, NULL, producer, (void *)ring);
+    pthread_create(&conth, NULL, consumer, (void *)ring);
 
     pthread_join(prodth, NULL);
     pthread_join(conth, NULL);
 
     pthread_mutex_destroy(ring->mut);
     free(ring->mut);
-    pthread_cond_destroy(ring->cond);
-    free(ring->cond);
+    pthread_cond_destroy(ring->condnotfull);
+    free(ring->condnotfull);
+    pthread_cond_destroy(ring->condnotempty);
+    free(ring->condnotempty);
 
     return 0;
 }
@@ -45,10 +49,12 @@ struct ringbuf *initring() {
     r->ringfull = 0;
     r->ringempty = 1;
     r->mut = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t));
-    r->cond = (pthread_cond_t *) malloc(sizeof(pthread_cond_t));
+    r->condnotfull = (pthread_cond_t *) malloc(sizeof(pthread_cond_t));
+    r->condnotempty = (pthread_cond_t *)malloc(sizeof(pthread_cond_t));
 
     pthread_mutex_init(r->mut, NULL);
-    pthread_cond_init(r->cond, NULL);
+    pthread_cond_init(r->condnotfull, NULL);
+    pthread_cond_init(r->condnotempty, NULL);
 
     return r;
 }
@@ -58,11 +64,12 @@ void *producer(void *r) {
     for(int i=0; i<20; i++) {
         pthread_mutex_lock(ring->mut);
         while (ring->ringfull) {
-            pthread_cond_wait(ring->cond, ring->mut);
+            printf("waiting on full ring\n");
+            pthread_cond_wait(ring->condnotfull, ring->mut);
         }
         ringadd(ring, i);
         pthread_mutex_unlock(ring->mut);
-        pthread_cond_signal(ring->cond);
+        pthread_cond_signal(ring->condnotempty);
     }
 
     return NULL;
@@ -74,32 +81,39 @@ void *consumer(void *r) {
     for(int i=0; i<20; i++) {
         pthread_mutex_lock(ring->mut);
         while (ring->ringempty) {
-            pthread_cond_wait(ring->cond, ring->mut);
+            printf("waiting on empty ring\n");
+            pthread_cond_wait(ring->condnotempty, ring->mut);
         }
         ringremove(ring, &n);
         pthread_mutex_unlock(ring->mut);
-        pthread_cond_signal(ring->cond);
+        pthread_cond_signal(ring->condnotfull);
     }    
 
     return NULL;
 }
 
 void ringadd(struct ringbuf *r, int n) {
-    if (r->tip == RINGSZ) {
-        r->tip = 0;
-    }
     r->ring[r->tip++] = n;
     printf("added item: %d\n", n);
-    if (r->tip == r->tail)
+    if (r->tip == RINGSZ)
+    {
+        r->tip = 0;
+    }
+    if (r->tip == r->tail) {
+        printf("ring is now full\n");
         r->ringfull = 1;
+    }
     r->ringempty = 0;
 }
 
 void ringremove(struct ringbuf *r, int *n) {
+    *n = r->ring[r->tail++];
+    printf("removed item: %d\n", *n);
     if (r->tail == RINGSZ)
         r->tail = 0;
-    *n = r->ring[r->tail++];
-    if (r->tail == r->tip)
+    if (r->tail == r->tip) {
+        printf("ring is now empty\n");
         r->ringempty = 1;
+    }
     r->ringfull = 0;
 }
