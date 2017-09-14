@@ -32,9 +32,11 @@ int main()
     struct ringbuf *ring;
 
     ring = initring();
+    assert(ring->resourcelock);
+
     printf("rings created\n");
-    pthread_create(&prodth, NULL, producer, (void *)&ring);
-    pthread_create(&conth, NULL, consumer, (void *)&ring);
+    pthread_create(&prodth, NULL, producer, (void *)ring);
+    pthread_create(&conth, NULL, consumer, (void *)ring);
 
     printf("threads created\n");
     pthread_join(prodth, NULL);
@@ -80,12 +82,16 @@ struct ringbuf *initring() {
 
 //reader
 void *consumer(void *r) {
+    printf("in reader\n");
     int n;
     struct ringbuf *ring = (struct ringbuf *) r;
     for(int i=0; i<LOOP; i++) {
         //entry section
+        printf("acquiring access lock in reader\n");
+        assert(ring->readaccess);
         pthread_mutex_lock(ring->readaccess);
         ring->readcount++;
+        printf("obtained access lock in reader\n");
         if (ring->readcount == 1) {
             printf("acquiring resource lock in reader\n");
             pthread_mutex_lock(ring->resourcelock);
@@ -93,11 +99,13 @@ void *consumer(void *r) {
                 printf("waiting on resource lock in reader\n");
                 pthread_cond_wait(ring->cond, ring->resourcelock);
             }
+            printf("obtained resource lock in reader\n");
         }
         pthread_mutex_unlock(ring->readaccess);
 
         //critical section
         ringremove(ring, &n);
+        printf("read item %d\n", n);
 
         //exit section
         pthread_mutex_lock(ring->readaccess);
@@ -109,6 +117,7 @@ void *consumer(void *r) {
         pthread_mutex_unlock(ring->readaccess);
         usleep(2);
     }
+    printf("reader done\n");
 
     return NULL;
 }
@@ -120,14 +129,15 @@ void *producer(void *r) {
     for(int i=0; i<LOOP; i++) {
         //entry section
         printf("acquiring resource lock in writer\n");
+        assert(ring->resourcelock);
         pthread_mutex_lock(ring->resourcelock);
-        printf("acquired resource lock in writer\n");
+        printf("obtained resource lock in writer\n");
         while (ring->readcount > 0) {
             printf("waiting on resource lock in writer\n");
             pthread_cond_wait(ring->cond, ring->resourcelock);
         }
+        printf("obtained resource lock in writer\n");
         //critical section
-        printf("in writer cs\n");
         ring->writing = 1;
         ringadd(ring, i);
         //exit section
@@ -136,6 +146,7 @@ void *producer(void *r) {
         pthread_cond_signal(ring->cond);
         usleep(2);
     }
+    printf("writer done\n");
 
     return NULL;
 }
