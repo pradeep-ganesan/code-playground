@@ -1,0 +1,11 @@
+Blip:
+    Above solution does not account for a very specific edge case where if there
+are two consecutive zeroes as substring of a ticket (excluding leading and 
+trailing double-zeroes), this algorithm could produce undesired result for that 
+ticket. 
+For eg, above given solution splits below ticket as
+123400456 -> 12 34 0 0 4 5 6 
+and fails to pick this ticket as valid due to '0' as a code. 
+However, if its split as below
+123400456 -> 1 2 3 40 04 5 6
+it can be termed as a valid ticket to be picked.
