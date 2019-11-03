@@ -1,2 +1,1 @@
-# leetcode
-leetcode solutions
+My playground to try things out
